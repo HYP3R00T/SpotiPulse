@@ -71,18 +71,7 @@ def followed_artists():
         raise HTTPException(status_code=r.status_code, detail=str(e))
 
 
-@app.post("/spotify/stop")
-def stop_playback():
-    try:
-        r = requests.put("https://api.spotify.com/v1/me/player/pause", headers=get_headers())
-        if r.status_code == 204:
-            return {"status": "Playback stopped"}
-        r.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=r.status_code, detail=str(e))
-
-
-@app.put("/player/pause")
+@app.put("/spotify/pause")
 def stop_playback_with_device(
     device_id: str = Query(
         None,
@@ -107,7 +96,7 @@ def stop_playback_with_device(
         raise HTTPException(status_code=r.status_code, detail=f"Failed to stop playback: {str(e)}")
 
 
-@app.put("/player/play")
+@app.put("/spotify/play")
 def play_track_with_device(
     device_id: str = Query(
         None,
