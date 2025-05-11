@@ -1,7 +1,6 @@
 # spotify_api.py
 from fastapi import FastAPI, HTTPException, Query
 from src.auth import get_access_token
-from src.spotify import generate_auth_url, exchange_code_for_token
 import requests
 
 app = FastAPI()
@@ -19,29 +18,7 @@ def get_headers():
 
 @app.get("/")
 def root():
-    return {"message": "Welcome"}
-
-
-@app.get("/spotify/auth-url")
-def get_auth_url():
-    return {"auth_url": generate_auth_url()}
-
-
-@app.post("/spotify/exchange-token")
-def exchange_token(redirected_url: str):
-    try:
-        from urllib.parse import urlparse, parse_qs
-
-        auth_code = parse_qs(urlparse(redirected_url).query).get("code", [None])[0]
-        if not auth_code:
-            raise HTTPException(status_code=400, detail="Authorization code not found in the URL.")
-        tokens = exchange_code_for_token(auth_code)
-        return {
-            "access_token": tokens.get("access_token"),
-            "refresh_token": tokens.get("refresh_token"),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to exchange token: {str(e)}")
+    return {"message": "Welcome to SpotiPulse"}
 
 
 @app.get("/spotify/top-tracks")
@@ -95,13 +72,72 @@ def stop_playback():
         raise HTTPException(status_code=r.status_code, detail=str(e))
 
 
-@app.post("/spotify/play")
-def play(uri: str = Query(..., description="Spotify URI of the track to play")):
+@app.put("/player/pause")
+def stop_playback_with_device(
+    device_id: str = Query(
+        None,
+        description="The id of the device this command is targeting. If not supplied, the user's currently active device is the target.",
+    ),
+):
+    """
+    Stop playback on a specific device or the currently active device.
+    """
     try:
-        body = {"uris": [uri]}
-        r = requests.put("https://api.spotify.com/v1/me/player/play", headers=get_headers(), json=body)
-        if r.status_code in (204, 202):
-            return {"status": "Playback started"}
+        headers = get_headers()
+        params = {"device_id": device_id} if device_id else {}
+
+        r = requests.put("https://api.spotify.com/v1/me/player/pause", headers=headers, params=params)
+
+        if r.status_code == 204:
+            return {"status": "Playback stopped"}
+        elif r.status_code == 404:
+            raise HTTPException(status_code=404, detail="No active device found to stop playback.")
         r.raise_for_status()
     except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=r.status_code, detail=str(e))
+        raise HTTPException(status_code=r.status_code, detail=f"Failed to stop playback: {str(e)}")
+
+
+@app.put("/player/play")
+def play_track_with_device(
+    device_id: str = Query(
+        None,
+        description="The id of the device this command is targeting. If not supplied, the user's currently active device is the target.",
+    ),
+    context_uri: str = Query(
+        None,
+        description="Optional. Spotify URI of the context to play. Valid contexts are albums, artists & playlists.",
+    ),
+    uris: list[str] = Query(
+        None,
+        description="Optional. A JSON array of the Spotify track URIs to play.",
+    ),
+    position_ms: int = Query(
+        None,
+        description="Optional. Indicates the position in milliseconds to start playback.",
+    ),
+):
+    """
+    Start playback on a specific device or the currently active device.
+    """
+    try:
+        headers = get_headers()
+        data = {}
+
+        if context_uri:
+            data["context_uri"] = context_uri
+        if uris:
+            data["uris"] = uris
+        if position_ms is not None:
+            data["position_ms"] = position_ms
+
+        params = {"device_id": device_id} if device_id else {}
+
+        r = requests.put("https://api.spotify.com/v1/me/player/play", headers=headers, params=params, json=data)
+
+        if r.status_code == 204:
+            return {"status": "Playback started"}
+        elif r.status_code == 404:
+            raise HTTPException(status_code=404, detail="No active device found to start playback.")
+        r.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=r.status_code, detail=f"Failed to start playback: {str(e)}")
