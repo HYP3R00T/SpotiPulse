@@ -1,48 +1,71 @@
-import json
-from fastapi import FastAPI
-import os
-from dotenv import load_dotenv
-import base64
+# spotify_api.py
+from fastapi import FastAPI, HTTPException, Query
+from src.auth import get_access_token
+import requests
 
-from requests import post
+app = FastAPI()
 
-load_dotenv()
-
-# Constants
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+BASE_URL = "https://api.spotify.com/v1/me"
 
 
-print(SPOTIFY_CLIENT_ID)
-print(SPOTIFY_CLIENT_SECRET)
+def get_headers():
+    return {"Authorization": f"Bearer {get_access_token()}"}
 
-def get_token():
-    url = "https://accounts.spotify.com/api/token"
 
-    auth_string = SPOTIFY_CLIENT_ID + ":" + SPOTIFY_CLIENT_SECRET
-    auth_bytes = auth_string.encode("utf-8")
-    auth_base64 = str(base64.b64encode(auth_bytes), "utf-8")
+@app.get("/")
+def root():
+    return {"message": "Welcome"}
 
-    headers = {
-        "Authorization": "Basic " + auth_base64,
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
 
-    data = {
-        "grant_type": "client_credentials"
-    }
+@app.get("/spotify/top-tracks")
+def top_tracks():
+    r = requests.get(f"{BASE_URL}/top/tracks?limit=10", headers=get_headers())
+    if r.status_code != 200:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return [
+        {"name": t["name"], "artists": [a["name"] for a in t["artists"]], "uri": t["uri"]} for t in r.json()["items"]
+    ]
 
-    result = post(url, headers=headers, data=data)
-    json_result = json.loads(result.content)
-    token = json_result["access_token"]
-    return token
 
-token = get_token()
-print(token)
-
-def get_auth_header(token):
+@app.get("/spotify/now-playing")
+def now_playing():
+    r = requests.get("https://api.spotify.com/v1/me/player/currently-playing", headers=get_headers())
+    if r.status_code == 204:
+        return {"status": "No song currently playing"}
+    elif r.status_code != 200:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    data = r.json()
     return {
-        "Authorization": "Bearer " + token
+        "name": data["item"]["name"],
+        "artists": [a["name"] for a in data["item"]["artists"]],
+        "is_playing": data["is_playing"],
     }
 
-token = get_token()
+
+@app.get("/spotify/followed-artists")
+def followed_artists():
+    r = requests.get(f"{BASE_URL}/following?type=artist", headers=get_headers())
+    if r.status_code != 200:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return [artist["name"] for artist in r.json()["artists"]["items"]]
+
+
+@app.post("/spotify/stop")
+def stop_playback():
+    r = requests.put("https://api.spotify.com/v1/me/player/pause", headers=get_headers())
+    return (
+        {"status": "Playback stopped"}
+        if r.status_code == 204
+        else HTTPException(status_code=r.status_code, detail=r.text)
+    )
+
+
+@app.post("/spotify/play")
+def play(uri: str = Query(..., description="Spotify URI of the track to play")):
+    body = {"uris": [uri]}
+    r = requests.put("https://api.spotify.com/v1/me/player/play", headers=get_headers(), json=body)
+    return (
+        {"status": "Playback started"}
+        if r.status_code in (204, 202)
+        else HTTPException(status_code=r.status_code, detail=r.text)
+    )
