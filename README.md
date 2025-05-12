@@ -9,6 +9,30 @@ SpotiPulse is a FastAPI-based application that integrates with the Spotify API t
 - **Followed Artists**: List the artists you follow on Spotify.
 - **Playback Control**: Stop the currently playing song or start playing any of your top 10 tracks.
 
+## API Endpoints
+
+- `GET spotify.hyperoot.dev/spotify/top-tracks`: Returns your top 10 tracks.
+- `GET spotify.hyperoot.dev/spotify/now-playing`: Shows the currently playing song.
+- `GET spotify.hyperoot.dev/spotify/followed-artists`: Lists the artists you follow.
+- `PUT spotify.hyperoot.dev/spotify/pause`: Stops the currently playing song.
+- `PUT spotify.hyperoot.dev/spotify/play`: Starts playing a specified track.
+
+## Deployment
+
+This application is designed to be deployed as part of your portfolio website. You can use Docker for deployment:
+
+1. Build the Docker image:
+
+   ```bash
+   docker build -t spotipulse .
+   ```
+
+2. Run the Docker container:
+
+   ```bash
+   docker run -d -p 8000:8000 --env-file .env spotipulse
+   ```
+
 ## Requirements
 
 - Python 3.13 or higher
@@ -54,30 +78,6 @@ SpotiPulse is a FastAPI-based application that integrates with the Spotify API t
    ```
 
 2. Access the API at `http://localhost:8000`.
-
-## API Endpoints
-
-- `GET /spotify/top-tracks`: Returns your top 10 tracks.
-- `GET /spotify/now-playing`: Shows the currently playing song.
-- `GET /spotify/followed-artists`: Lists the artists you follow.
-- `PUT /spotify/pause`: Stops the currently playing song.
-- `PUT /spotify/play`: Starts playing a specified track.
-
-## Deployment
-
-This application is designed to be deployed as part of your portfolio website. You can use Docker for deployment:
-
-1. Build the Docker image:
-
-   ```bash
-   docker build -t spotipulse .
-   ```
-
-2. Run the Docker container:
-
-   ```bash
-   docker run -d -p 8000:8000 --env-file .env spotipulse
-   ```
 
 ## License
 
